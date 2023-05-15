@@ -56,7 +56,7 @@ int tlenamelength;
 
 static const uint32_t GPSBaud = 9600;
 
-#define U8LOG_WIDTH 32
+#define U8LOG_WIDTH 28
 #define U8LOG_HEIGHT 7
 uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT*10];
 U8G2LOG u8g2log;
@@ -66,6 +66,11 @@ TinyGPSPlus gps;
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 int gpschar;
+
+int satsabove=0;
+int sats=0;
+int satsdisplay = 0;
+int satsabovedisplay = 0;
 
 void setup(void) {
 
@@ -106,17 +111,29 @@ void setup(void) {
 }
 
 void loop(void) {
+
+  u8g2.firstPage();
+  do {
+
+    u8g2.setFont(u8g2_font_u8glib_4_tr);    // u8g2 font 
+    
   //check file is open
   if (myFile.available()){
    // Serial.println("file open");
   }
   // if not, open it
   else{
+       satsdisplay = sats;
+       satsabovedisplay = satsabove;
        myFile = SD.open("tle.txt");
-       
+       Serial.println("\n");
+       Serial.println("Starting recheck");
+       Serial.println("\n");
        u8g2log.print("\n");
-       u8g2log.print("Starting recheck");
+       u8g2log.println("Starting recheck");
        u8g2log.print("\n");
+       sats=0;
+       satsabove=0;
        }
   
   
@@ -129,6 +146,11 @@ void loop(void) {
     tle1string.toCharArray(tlel1, tle1string.length()+1); 
     tle2string.toCharArray(tlel2, tle2string.length()+1); 
 
+    sats = sats +1;
+    
+    Serial.println(sats);
+    
+    
     
      //Serial.println(tleName);
     // Serial.println(tlel1);
@@ -184,17 +206,18 @@ void loop(void) {
         MySAT.latlon(dSatLAT, dSatLON);     // Get the rectangular coordinates
         MySAT.elaz(MyQTH, dSatEL, dSatAZ);  // Get azimut and elevation for MyQTH
 
-      if (dSatEL > 7) {
+      if (dSatEL > 15) {
+      satsabove = satsabove+1;
       u8g2log.println(tleName);
+      Serial.println(tleName);
       
+    
+      Serial.print("sats above = ");
+      Serial.println(satsabove);
+      Serial.println("\n");
+        
+      //u8g2log.print("\n");
       }
-
-         
-  u8g2.firstPage();
-  do {
-         
-        u8g2.setFont(u8g2_font_u8glib_4_tr);    // u8g2 font 
-   
 
     u8g2.drawFrame(0, 0, 128,64);  //setup fixed screen info and borders
     u8g2.drawLine(0, 9, 128,9);
@@ -203,6 +226,30 @@ void loop(void) {
     u8g2.drawLine(0, 54, 128,54);
     u8g2.drawStr(2, 61, "OKUBO HEAVY INDUSTRIES");
 
+    u8g2.drawLine(104, 9, 104,54);
+    u8g2.drawLine(105, 31, 127,31);
+    u8g2.drawStr(107, 16, ">15");
+    u8g2.drawCircle(119,13,1);
+    u8g2.drawStr(107, 37, "active");
+
+    
+
+      u8g2.setCursor(107, 23);
+  //  if (satsabovedisplay = 0){
+   //   u8g2.println(satsabove); 
+  //  } else {
+      u8g2.println(satsabovedisplay);
+ //   }
+   
+      u8g2.setCursor(107, 44);
+ //   if (satsdisplay = 0){
+   //   u8g2.print(sats); 
+ //   } else {
+      u8g2.print(satsdisplay);
+ //   }
+
+    
+   
         if (!time_valid)
         {
           u8g2.drawStr(74, 7, "Time : ********");
@@ -216,6 +263,8 @@ void loop(void) {
           u8g2.print(time_string);    
         }
 
+      
+    //u8g2.drawLog(3, 34, u8g2log);
     u8g2.drawLog(3, 16, u8g2log);
   } while ( u8g2.nextPage() );
   
