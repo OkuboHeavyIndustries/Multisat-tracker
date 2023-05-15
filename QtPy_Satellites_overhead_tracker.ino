@@ -203,53 +203,6 @@ void loop(void) {
     u8g2.drawLine(0, 54, 128,54);
     u8g2.drawStr(2, 61, "OKUBO HEAVY INDUSTRIES");
 
-     /*
-     if (!loc_valid)
-      {          
-      
-        u8g2.drawStr(3, 16, "LAT : ********");
-        
-        u8g2.drawStr(60, 16, "LON : ********");
-        
-       }
-       else
-       {
-          u8g2.drawStr(3, 16, "LAT :");
-          u8g2.setCursor(22, 16);
-          u8g2.println(lat_val, 6);
-          
-          
-          u8g2.drawStr(60, 16, "LON :");
-          u8g2.setCursor(79, 16);
-          u8g2.println(lng_val, 6);
-          
-        }
-        if (!alt_valid)
-        {
-          
-          u8g2.drawStr(3, 24, "ALT : ********");
-        }
-        else
-        {
-           
-          u8g2.drawStr(3, 24, "ALT :");
-          u8g2.setCursor(22, 24);
-          u8g2.println(alt_m_val, 2);   
-        }
-        
-        if (!sats_valid)
-        {
-          
-          u8g2.drawStr(60, 24, "GPS LOCK : **");
-        }
-        else
-        {
-         
-          u8g2.drawStr(60, 24, "GPS LOCK :");
-          u8g2.setCursor(100, 24);
-          u8g2.println(sats_val, 1);   
-        }
-        */
         if (!time_valid)
         {
           u8g2.drawStr(74, 7, "Time : ********");
