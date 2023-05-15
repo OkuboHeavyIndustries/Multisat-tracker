@@ -14,23 +14,14 @@ File myFile;
 
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel pixels(1, PIN_NEOPIXEL);
-/*
- *ISS (ZARYA)             
-1 25544U 98067A   23106.77243927  .00020111  00000+0  36079-3 0  9995
-2 25544  51.6392 272.8882 0005955 200.6729 293.6537 15.49882047392260
 
-NOAA 18                 
-1 28654U 05018A   21114.89831698  .00000110  00000-0  83978-4 0  9991
-2 28654  98.9980 179.5396 0015256  75.4212 284.8650 14.12600330820889
- */
-//const char *tleName = "ISS";
-//const char *tlel1   = "1 25544U 98067A   23106.77243927  .00020111  00000+0  36079-3 0  9995";
-//const char *tlel2   = "2 25544  51.6392 272.8882 0005955 200.6729 293.6537 15.49882047392260";
-char *tleName = "ISS";
-char *tlel1   = "1 25544U 98067A   23106.77243927  .00020111  00000+0  36079-3 0  9995";
-char *tlel2   = "2 25544  51.6392 272.8882 0005955 200.6729 293.6537 15.49882047392260";
+//char *tleName = "ISS";
+//char *tlel1   = "1 25544U 98067A   23106.77243927  .00020111  00000+0  36079-3 0  9995";
+//char *tlel2   = "2 25544  51.6392 272.8882 0005955 200.6729 293.6537 15.49882047392260";
 
-
+char tleName [30];
+char tlel1 [80];
+char tlel2 [80];
 
 const char  *pcMyName = "OHI";    // Observer name
 
@@ -57,11 +48,17 @@ double       dSunEL   = 0;           // Sun elevation
 
 char         acBuffer[20];            // Buffer for ASCII time
 
-String tlenamebuffer;
-String tle1buffer;
-String tle2buffer;
+String tlenamestring;
+String tle1string;
+String tle2string;
+
+int tlenamelength;
 
 static const uint32_t GPSBaud = 9600;
+
+unsigned long previousMillis = 0;
+const long interval = 15000; //time to switch to next sattelite
+
 
 TinyGPSPlus gps;
 
@@ -75,12 +72,9 @@ int ylat;
 int xlonb;
 int ylatb;
 
-#define U8LOG_WIDTH 32
-#define U8LOG_HEIGHT 4
-uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT*10];
-U8G2LOG u8g2log;
-
 int gpschar;
+
+// map of the World
 
 #define world_width 128
 #define world_height 62
@@ -174,10 +168,7 @@ void setup(void) {
   Serial1.begin(GPSBaud);
   Serial.begin(GPSBaud); //uncomment to debug
   u8g2.begin();  
-  u8g2log.begin(U8LOG_WIDTH, U8LOG_HEIGHT, u8log_buffer);
-  u8g2log.setLineHeightOffset(1); // set extra space between lines in pixel, this can be negative
-  u8g2log.setRedrawMode(1);   // 0: Update screen with newline, 1: Update screen for every char   
-
+  
   pixels.begin();  // initialize the neopixel  
 
   while (!Serial) {
@@ -195,60 +186,68 @@ void setup(void) {
 
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  myFile = SD.open("test.txt", FILE_WRITE);
+ 
 
-  // if the file opened okay, write to it:
-  if (myFile) {
-    Serial.print("Writing to test.txt...");
-    myFile.println("testing 1, 2, 3.");
+  // open the file for reading:
+  myFile = SD.open("tle.txt");
+
+      tlenamestring = myFile.readStringUntil('\n');
+      tlenamestring.trim();
+        tlenamelength = tlenamestring.length();
+      tle1string = myFile.readStringUntil('\n');  
+      tle2string = myFile.readStringUntil('\n');
+    
+      
+      tlenamestring.toCharArray(tleName, tlenamestring.length()+1); 
+      Serial.println(tleName);
+      //Serial.println(tlenamelength);
+      
+     
+      tle1string.toCharArray(tlel1, tle1string.length()+1); 
+      Serial.println(tlel1);
+     
+      tle2string.toCharArray(tlel2, tle2string.length()+1);   
+      Serial.println(tlel2);
+    
     // close the file:
-    myFile.close();
-    Serial.println("done.");
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
-  }
+  //  myFile.close();
 
-  // re-open the file for reading:
-  myFile = SD.open("twoline.txt");
-  if (myFile) {
-    Serial.println("twoline.txt:");
-
-    // read from the file until there's nothing else in it:
-    while (myFile.available()) {
-      Serial.write(myFile.read());
-    tlenamebuffer = myFile.readStringUntil('\n');
-    Serial.println(tlenamebuffer); //Printing for debugging purpose 
-    tlenamebuffer.toCharArray(tleName, 80);  
-   
-    tle1buffer = myFile.readStringUntil('\n');
-    Serial.println(tle1buffer); //Printing for debugging purpose 
-      tle1buffer.toCharArray(tlel1, 80); 
-          
-    tle2buffer = myFile.readStringUntil('\n');
-    Serial.println(tle2buffer); //Printing for debugging purpose 
-    tle2buffer.toCharArray(tlel2, 80);    */
-    //do some action here
-    }
-    // close the file:
-    myFile.close();
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
-  }
-  
 }
 
 void loop(void) {
+  //check file is open
+  if (myFile.available()){
+   // Serial.println("file open");
+  }
+  // if not, open it
+  else{
+       myFile = SD.open("tle.txt");
+       }
+  
+  unsigned long currentMillis = millis(); //change the TLEs every 15 seconds
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+    tlenamestring = myFile.readStringUntil('\n');
+    tlenamestring.trim();
+      tlenamelength = tlenamestring.length();
+    tle1string = myFile.readStringUntil('\n');  
+    tle2string = myFile.readStringUntil('\n');
+    tlenamestring.toCharArray(tleName, tlenamestring.length()+1); 
+    tle1string.toCharArray(tlel1, tle1string.length()+1); 
+    tle2string.toCharArray(tlel2, tle2string.length()+1); 
+
+     Serial.println(tleName);
+     Serial.println(tlel1);
+     Serial.println(tlel2);
+  }
   
   while (Serial1.available()>0)
       {  gpschar = Serial1.read(); //read raw gps data to gpschar
        // Serial.write(gpschar);  // uncomment to send raw gps over Serial to debug
-      //  u8g2log.write(gpschar);   // write raw gps data to u8g2log buffer
+      
         gps.encode(gpschar);      // extract useful info from raw gps data
       }
-  
- // u8g2.drawLog(3, 35, u8g2log);     // draw the log content on the display
   
      double lat_val, lng_val, alt_m_val;
      uint8_t hr_val, min_val, sec_val, hr_val_jp, sats_val;
@@ -282,13 +281,13 @@ void loop(void) {
         P13DateTime MyTime(year_val, month_val, day_val, hr_val, min_val, sec_val); // Set start time for the prediction
         P13Observer MyQTH(pcMyName, dMyLAT, dMyLON, dMyALT);              // Set observer coordinates
 
-        P13Satellite MySAT(tleName, tlel1, tlel2);                        // Create ISS data from TLE
+        P13Satellite MySAT(tleName, tlel1, tlel2);                        // Create Sattelite data from TLE
 
         
 
 
         MyTime.ascii(acBuffer);             // Get time for prediction as ASCII string
-        MySAT.predict(MyTime);              // Predict ISS for specific time
+        MySAT.predict(MyTime);              // Predict Sattelite for specific time
         MySAT.latlon(dSatLAT, dSatLON);     // Get the rectangular coordinates
         MySAT.elaz(MyQTH, dSatEL, dSatAZ);  // Get azimut and elevation for MyQTH
 
@@ -314,16 +313,10 @@ void loop(void) {
     u8g2.drawFrame(0, 0, 128,64);  //setup fixed screen info and borders
     u8g2.drawLine(0, 9, 128,9);
     u8g2.drawLine(0, 27, 128,27);
-    u8g2.drawStr(2, 7, "MISSION CONTROL ");
-    
+    u8g2.drawStr(2, 7, "MULTI-SAT TRACK");
     u8g2.drawLine(0, 54, 128,54);
     u8g2.drawStr(2, 61, "OKUBO HEAVY INDUSTRIES");
 
-    /*if (hr_val < 15) { hr_val_jp = hr_val + 9;  // convert UTC to Japan time zone
-     }
-     else {hr_val_jp = hr_val -15;
-     }
-*/
      
      if (!loc_valid)
       {          
@@ -383,43 +376,41 @@ void loop(void) {
           u8g2.setCursor(74, 7);
           u8g2.print(time_string);    
         }
-  
-        
-        u8g2log.print(tleName);
-        u8g2log.print(" UTC:");
-        u8g2log.print(acBuffer);
-        
-        u8g2log.print("\n");
-        u8g2log.print("Lat: ");
-        u8g2log.print(dSatLAT,4);
-        u8g2log.print("  Lon: ");
-        u8g2log.print(dSatLON,4);
 
-        
- 
-          u8g2log.print("\n");
-          u8g2log.print("Az: ");
-          u8g2log.print(dSatAZ,2);
-          u8g2log.print("   El: ");
-          u8g2log.println(dSatEL,2); 
-          
+         u8g2.drawStr(3, 52, "UTC:");
+         u8g2.setCursor(22, 52);
+         u8g2.println(acBuffer);
          
-          u8g2log.print("RX: ");
-          u8g2log.print(MySAT.doppler(dfreqRX, P13_FRX),6);
-          u8g2log.print(", TX: ");
-          u8g2log.println(MySAT.doppler(dfreqTX, P13_FTX),6);
-          //if (dSatEL <= 8) { 
-          u8g2.drawLog(3, 34, u8g2log);
+        
+         u8g2.drawStr(3, 40, "LAT:");
+         u8g2.setCursor(22, 40);
+         u8g2.println(dSatLAT,4);
+         u8g2.drawStr(60, 40, "  LON: ");
+         u8g2.setCursor(80, 40);
+         u8g2.println(dSatLON,4); 
+
+         u8g2.drawStr(3, 46, "AZ:");
+         u8g2.setCursor(22, 46);
+         u8g2.println(dSatAZ,2);
+        
+         u8g2.drawStr(60, 46, "  EL: ");
+         u8g2.setCursor(80, 46);
+         u8g2.println(dSatEL,2);
+
+         u8g2.drawStr(3, 34, "SAT:");
+         u8g2.setCursor(22, 34);
+         u8g2.println(tleName);
+         
+     
         }
 
     else {
     u8g2.setFont(u8g2_font_u8glib_4_tr);
     u8g2.setDrawColor(1);
-    //u8g2.drawFrame(0,0,127,63);
     u8g2.drawXBMP(0,1, world_width, world_height, world_bits);
     u8g2.drawFrame(0,0,128,64);
     u8g2.setDrawColor(2);
-    //Draw current location
+    //Calculate current location on screen
     float klon = dSatLON;
     float klat = dSatLAT;
     if (klon > 0) {
@@ -439,14 +430,14 @@ void loop(void) {
     
 
 
-    // full orbit
+    // Orbital path calculations
         for (int delta = -50; delta < 50; delta = delta + 1) {
         P13DateTime MyTime2(year_val, month_val, day_val, hr_val, (min_val + delta) , sec_val); // Set start time for the prediction
         P13Observer MyQTH(pcMyName, dMyLAT, dMyLON, dMyALT);              // Set observer coordinates
 
         P13Satellite MySAT2(tleName, tlel1, tlel2);                        // Create ISS data from TLE
 
-        //MyTime.ascii(acBuffer);             // Get time for prediction as ASCII string
+  
         MySAT2.predict(MyTime2);              // Predict ISS for specific time
         MySAT2.latlon(dSatLATb, dSatLONb);     // Get the rectangular coordinates
 
@@ -466,11 +457,11 @@ void loop(void) {
           klatb=-klatb;
           ylatb = (((klatb/90)*32)+32);  
         }
-    
+    //draw orbital path
     u8g2.drawPixel(xlonb, ylatb);
     
         } 
-    
+    //draw current location
     u8g2.setDrawColor(0);
     u8g2.drawCircle(xlon, ylat, 3);
     u8g2.setDrawColor(1);
@@ -482,15 +473,41 @@ void loop(void) {
     u8g2.setFont(u8g2_font_u8glib_4_tr);    // u8g2 font
     //u8g2.setCursor(xlon-5, ylat+8);
     u8g2.setDrawColor(0);
-    u8g2.drawBox(xlon-6, ylat+4,13,6);
+
+    // Attempt to keep label on screen based on screen quadrant
+    if ((xlon <= 64) && (ylat <= 32)){
+    u8g2.drawBox(xlon-1, ylat+4,(tlenamestring.length()+1)*4,6);
     //u8g2.drawBox(xlon-6, ylat+4,28,6);
-    u8g2.setCursor(xlon-5, ylat+9);
+    u8g2.setCursor(xlon, ylat+9);
+    }
+
+    if ((xlon <= 64) && (ylat > 32)){
+    u8g2.drawBox(xlon-1, ylat-10,(tlenamestring.length())*4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    u8g2.setCursor(xlon, ylat-5);
+    }
+
+    if ((xlon > 64) && (ylat <= 32)){
+    u8g2.drawBox(xlon-((tlenamestring.length())*4+6), ylat+4,(tlenamestring.length())*4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    u8g2.setCursor(xlon-((tlenamestring.length())*4+5), ylat+9);
+    }
+
+    if ((xlon > 64) && (ylat > 32)){
+    u8g2.drawBox(xlon-((tlenamestring.length())*4+6), ylat-10,(tlenamestring.length())*4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    u8g2.setCursor(xlon-((tlenamestring.length())*4+5), ylat-5);
+    }
+
+    // write sattelite name
     u8g2.setDrawColor(1);
-    u8g2.print("ISS");
+    //u8g2.print("ISS");
     //u8g2.print("NOAA18");
+    u8g2.print(tleName);
+    
 
 
     }
   } while ( u8g2.nextPage() );
-  //delay(1000);
+  
 }
