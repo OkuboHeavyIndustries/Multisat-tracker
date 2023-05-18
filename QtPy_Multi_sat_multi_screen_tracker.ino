@@ -1,0 +1,527 @@
+
+#include <Arduino.h>
+#include <U8g2lib.h>
+#include <TinyGPS++.h> 
+#include <ArduinoP13.h>
+#include <Time.h>
+#include <SPI.h>
+#include <SD.h>
+
+Sd2Card card;
+SdVolume volume;
+SdFile root;
+File myFile;
+
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel pixels(1, PIN_NEOPIXEL);
+
+//char *tleName = "ISS";
+//char *tlel1   = "1 25544U 98067A   23106.77243927  .00020111  00000+0  36079-3 0  9995";
+//char *tlel2   = "2 25544  51.6392 272.8882 0005955 200.6729 293.6537 15.49882047392260";
+
+char tleName [30];
+char tlel1 [80];
+char tlel2 [80];
+
+const char  *pcMyName = "OHI";    // Observer name
+
+
+double       dfreqRX  = 137.100;     // Nominal downlink frequency
+double       dfreqTX  = 437.800;     // Nominal uplink frequency
+
+
+double       dSatLAT  = 0;           // Satellite latitude
+double       dSatLON  = 0;           // Satellite longitude
+double       dSatAZ   = 0;           // Satellite azimuth
+double       dSatEL   = 0;           // Satellite elevation
+
+double       dSatLATb  = 0;           // Satellite latitude
+double       dSatLONb  = 0;           // Satellite longitude
+double       dSatAZb   = 0;           // Satellite azimuth
+double       dSatELb   = 0;           // Satellite elevation
+
+
+double       dSunLAT  = 0;           // Sun latitude
+double       dSunLON  = 0;           // Sun longitude
+double       dSunAZ   = 0;           // Sun azimuth
+double       dSunEL   = 0;           // Sun elevation
+
+char         acBuffer[20];            // Buffer for ASCII time
+
+String tlenamestring;
+String tle1string;
+String tle2string;
+
+int tlenamelength;
+
+static const uint32_t GPSBaud = 9600;
+
+unsigned long previousMillis = 0;
+const long interval = 5000; //time to switch to next sattelite
+
+
+TinyGPSPlus gps;
+
+
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C OLED_2(U8G2_R0, 1, 2, /* reset=*/ U8X8_PIN_NONE);
+//U8G2_SSD1306_128X64_NONAME_F_SW_I2C OLED_3(U8G2_R0, 2, 3, /* reset=*/ U8X8_PIN_NONE);
+int xlon;
+int ylat;
+
+int xlonb;
+int ylatb;
+
+int gpschar;
+/*
+#define U8LOG_WIDTH 32
+#define U8LOG_HEIGHT 4
+uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT*10];
+U8G2LOG u8g2log;
+*/
+// map of the World
+
+#define world_width 128
+#define world_height 62
+static unsigned char world_bits[] = {
+  0x00, 0x00, 0x00, 0x00, 0xF0, 0x81, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xFF, 0xFF, 0xFF, 0x07, 
+  0x00, 0x01, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF9, 
+  0xFF, 0xFF, 0xFF, 0x01, 0xE0, 0x01, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0xF0, 0xFB, 0x0F, 0xF9, 0xFF, 0x01, 0x00, 0x00, 0x78, 0x80, 
+  0xFF, 0x01, 0x07, 0x00, 0x00, 0x00, 0xF8, 0xF7, 0x3F, 0xF0, 0xFF, 0x00, 
+  0x00, 0x00, 0x0C, 0xFB, 0xFF, 0x3F, 0x1E, 0x00, 0xC0, 0x7F, 0xDF, 0xEF, 
+  0xFF, 0xE0, 0xFF, 0x00, 0xC0, 0x0F, 0xE0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
+  0xE7, 0xFF, 0xFF, 0xFF, 0xE7, 0xF3, 0x0F, 0x00, 0xF0, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xE6, 0xFF, 0xFF, 0xFF, 0xE7, 0xC3, 0x03, 0x06, 
+  0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0x7F, 
+  0xF0, 0x81, 0x01, 0x00, 0x7C, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 
+  0xC0, 0x83, 0xFF, 0x7F, 0xF0, 0x03, 0x00, 0x40, 0x7C, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0x7F, 0x03, 0x80, 0x00, 0xFF, 0xFF, 0xE7, 0x07, 0x00, 0x40, 
+  0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x81, 0x03, 0x00, 0x00, 0xFE, 0xFF, 
+  0xF7, 0x1F, 0x00, 0xE0, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x87, 0x01, 
+  0x00, 0x00, 0xF8, 0xFF, 0xFF, 0x1F, 0x00, 0xC0, 0xFF, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0x07, 0x00, 0x00, 0x00, 0xF8, 0xFF, 0xFF, 0x17, 0x00, 0xC0, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x00, 0x00, 0x00, 0xF8, 0xFF, 
+  0xFF, 0x02, 0x00, 0xA0, 0xFF, 0xE7, 0xFF, 0xFF, 0xFF, 0xFF, 0x06, 0x00, 
+  0x00, 0x00, 0xF0, 0xFF, 0x7F, 0x00, 0x00, 0xE0, 0xF9, 0xF7, 0xFD, 0xFF, 
+  0xFF, 0x7F, 0x04, 0x00, 0x00, 0x00, 0xF0, 0xFF, 0x3F, 0x00, 0x00, 0xE0, 
+  0x6D, 0xFF, 0xFF, 0xFF, 0xFF, 0x1F, 0x02, 0x00, 0x00, 0x00, 0xE0, 0xFF, 
+  0x1F, 0x00, 0x00, 0xE0, 0x0F, 0xF8, 0xFF, 0xFF, 0xFF, 0xE7, 0x03, 0x00, 
+  0x00, 0x00, 0xC0, 0xFF, 0x0F, 0x00, 0x00, 0xF0, 0x9F, 0xEA, 0xFF, 0xFF, 
+  0xFF, 0x67, 0x01, 0x00, 0x00, 0x00, 0x80, 0xFF, 0x0D, 0x00, 0x00, 0xF0, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x80, 0xBF, 
+  0x0C, 0x00, 0x00, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x07, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x3D, 0x08, 0x00, 0x00, 0xF8, 0xFF, 0xFF, 0x3F, 0xFF, 
+  0xFF, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3C, 0x11, 0x00, 0x00, 0xFC, 
+  0xFF, 0xFF, 0x3F, 0x7F, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF8, 
+  0x61, 0x00, 0x00, 0xFC, 0xFF, 0xDF, 0x0F, 0x3E, 0x3E, 0x08, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0xE0, 0x07, 0x00, 0x00, 0xFC, 0xFF, 0xFF, 0x03, 0x1C, 
+  0x7C, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0xFC, 
+  0xFF, 0xFF, 0x01, 0x1C, 0x78, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xE6, 0x03, 0x00, 0xFC, 0xFF, 0xFF, 0x07, 0x08, 0x68, 0x18, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0xF8, 0x0F, 0x00, 0xF8, 0xFF, 0xFF, 0x03, 0x10, 
+  0x08, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x1F, 0x00, 0xE0, 
+  0xFC, 0xFF, 0x01, 0x00, 0x1C, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xF0, 0x7F, 0x00, 0x00, 0xF8, 0xFF, 0x00, 0x00, 0x98, 0x03, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0xF8, 0xFF, 0x00, 0x00, 0xF8, 0x7F, 0x00, 0x00, 
+  0x98, 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF8, 0xFF, 0x03, 0x00, 
+  0xF0, 0x7F, 0x00, 0x00, 0xB0, 0xCF, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xF8, 0xFF, 0x0F, 0x00, 0xF0, 0x7F, 0x00, 0x00, 0xE0, 0x00, 0x0E, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0xF0, 0xFF, 0x07, 0x00, 0xE0, 0x3F, 0x00, 0x00, 
+  0x00, 0x14, 0x1E, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0xFF, 0x07, 0x00, 
+  0xE0, 0x3F, 0x00, 0x00, 0x00, 0xC0, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xE0, 0xFF, 0x07, 0x00, 0xF0, 0x7F, 0x03, 0x00, 0x00, 0xE0, 0x0C, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0xC0, 0xFF, 0x03, 0x00, 0xF0, 0xBF, 0x03, 0x00, 
+  0x00, 0xF8, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xFF, 0x07, 0x00, 
+  0xF0, 0x1F, 0x01, 0x00, 0x00, 0xFE, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x80, 0xFF, 0x01, 0x00, 0xE0, 0x9F, 0x01, 0x00, 0x00, 0xFF, 0x3F, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x80, 0x7F, 0x00, 0x00, 0xE0, 0x0F, 0x00, 0x00, 
+  0x00, 0xFF, 0x3F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x3F, 0x00, 0x00, 
+  0xE0, 0x0F, 0x00, 0x00, 0x00, 0xFF, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xC0, 0x7F, 0x00, 0x00, 0xC0, 0x07, 0x00, 0x00, 0x00, 0xFE, 0x3F, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0xC0, 0x1F, 0x00, 0x00, 0xC0, 0x01, 0x00, 0x00, 
+  0x00, 0x0E, 0x3F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x0F, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1E, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xC0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x20, 
+  0x00, 0x00, 0x00, 0x00, 0xC0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x01, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 
+  0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x01, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0xFF, 0xD1, 0x03, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x80, 0x03, 0x00, 0x00, 0x00, 0xC0, 0xFF, 0xF9, 
+  0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x20, 0xC0, 0x07, 0x00, 0xF0, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x00, 0x00, 0xFF, 0xF9, 
+  0xFF, 0x07, 0x00, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x07, 
+  0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0xFF, 0x03, 0x40, 0xFE, 0xFF, 0xFF, 0xBF, 0xC4, 0xF8, 0xFF, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xF7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, };
+
+void setup(void) {
+
+  Serial1.begin(GPSBaud);
+  Serial.begin(GPSBaud); //uncomment to debug
+  u8g2.begin();  
+  OLED_2.begin();
+  //OLED_3.begin();
+  pixels.begin();  // initialize the neopixel  
+
+ // while (!Serial) {
+ //   ; // wait for serial port to connect. Needed for native USB port only
+ // }
+
+
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(0)) {
+    Serial.println("initialization failed!");
+    while (1);
+  }
+  Serial.println("initialization done.");
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+ 
+
+  // open the file for reading:
+  myFile = SD.open("tle.txt");
+
+      tlenamestring = myFile.readStringUntil('\n');
+      tlenamestring.trim();
+        tlenamelength = tlenamestring.length();
+      tle1string = myFile.readStringUntil('\n');  
+      tle2string = myFile.readStringUntil('\n');
+    
+      
+      tlenamestring.toCharArray(tleName, tlenamestring.length()+1); 
+      Serial.println(tleName);
+      //Serial.println(tlenamelength);
+      
+     
+      tle1string.toCharArray(tlel1, tle1string.length()+1); 
+      Serial.println(tlel1);
+     
+      tle2string.toCharArray(tlel2, tle2string.length()+1);   
+      Serial.println(tlel2);
+    
+    // close the file: //don't!
+  //  myFile.close();
+
+}
+
+void loop(void) {
+  //check file is open
+  if (myFile.available()){
+   // Serial.println("file open");
+  }
+  // if not, open it
+  else{
+       myFile = SD.open("tle.txt");
+       }
+  
+  unsigned long currentMillis = millis(); //change the TLEs every 15 seconds
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+    tlenamestring = myFile.readStringUntil('\n');
+    tlenamestring.trim();
+      tlenamelength = tlenamestring.length();
+    tle1string = myFile.readStringUntil('\n');  
+    tle2string = myFile.readStringUntil('\n');
+    tlenamestring.toCharArray(tleName, tlenamestring.length()+1); 
+    tle1string.toCharArray(tlel1, tle1string.length()+1); 
+    tle2string.toCharArray(tlel2, tle2string.length()+1); 
+
+     Serial.println(tleName);
+     Serial.println(tlel1);
+     Serial.println(tlel2);
+  }
+  
+  while (Serial1.available()>0)
+      {  gpschar = Serial1.read(); //read raw gps data to gpschar
+       // Serial.write(gpschar);  // uncomment to send raw gps over Serial to debug
+    //  u8g2log.write(gpschar);   // write raw gps data to u8g2log buffer
+        gps.encode(gpschar);      // extract useful info from raw gps data
+      }
+  
+     double lat_val, lng_val, alt_m_val;
+     uint8_t hr_val, min_val, sec_val, hr_val_jp, sats_val;
+     bool loc_valid, alt_valid, time_valid, sats_valid;
+     lat_val = gps.location.lat();  /* Get latitude data */
+     loc_valid = gps.location.isValid(); /* Check if valid location data is available */
+     lng_val = gps.location.lng(); /* Get longtitude data */
+     alt_m_val = gps.altitude.meters();  /* Get altitude data in meters */
+     alt_valid = gps.altitude.isValid(); /* Check if valid altitude data is available */
+     hr_val = gps.time.hour(); /* Get hour */
+     min_val = gps.time.minute();  /* Get minutes */
+     sec_val = gps.time.second();  /* Get seconds */
+     time_valid = gps.time.isValid();  /* Check if valid time data is available */
+      double year_val = (gps.date.year());
+      double month_val = (gps.date.month());
+      double day_val = (gps.date.day());
+     sats_valid = gps.satellites.isValid();
+     sats_val = gps.satellites.value();
+
+     if (hr_val < 15) { hr_val_jp = hr_val + 9;  // convert UTC to Japan time zone
+     }
+     else {hr_val_jp = hr_val -15;
+     }
+
+
+      double dMyLAT = gps.location.lat();
+      double dMyLON = gps.location.lng();
+      double dMyALT = gps.altitude.meters();
+        
+        //P13Sun Sun;                                                       // Create object for the sun
+        P13DateTime MyTime(year_val, month_val, day_val, hr_val, min_val, sec_val); // Set start time for the prediction
+        P13Observer MyQTH(pcMyName, dMyLAT, dMyLON, dMyALT);              // Set observer coordinates
+
+        P13Satellite MySAT(tleName, tlel1, tlel2);                        // Create Sattelite data from TLE
+
+        
+
+
+        MyTime.ascii(acBuffer);             // Get time for prediction as ASCII string
+        MySAT.predict(MyTime);              // Predict Sattelite for specific time
+        MySAT.latlon(dSatLAT, dSatLON);     // Get the rectangular coordinates
+        MySAT.elaz(MyQTH, dSatEL, dSatAZ);  // Get azimut and elevation for MyQTH
+
+          //Light the neopixel if ISS is above the horizon
+          if (dSatEL > 0 ) {
+            pixels.setPixelColor(0, pixels.Color((dSatEL * 2.8), (dSatEL * 2.8), (dSatAZ * 0.7)));
+            pixels.show();
+            u8g2.setPowerSave(0);
+          
+           } else {
+           pixels.clear();
+           pixels.show(); 
+           u8g2.setPowerSave(0);
+          }
+
+         
+  u8g2.firstPage();
+  OLED_2.firstPage();
+ // OLED_3.firstPage();
+  do {
+     // if (sec_val < (30)) {    
+        u8g2.setFont(u8g2_font_u8glib_4_tr);    // u8g2 font 
+        
+
+    u8g2.drawFrame(0, 0, 128,64);  //setup fixed screen info and borders
+    u8g2.drawLine(0, 9, 128,9);
+    u8g2.drawLine(0, 27, 128,27);
+    u8g2.drawStr(2, 7, "MULTI-SAT TRACK");
+    u8g2.drawLine(0, 54, 128,54);
+    u8g2.drawStr(2, 61, "OKUBO HEAVY INDUSTRIES");
+
+     
+     if (!loc_valid)
+      {          
+      
+        u8g2.drawStr(3, 16, "LAT : ********");
+        
+        u8g2.drawStr(60, 16, "LON : ********");
+        
+       }
+       else
+       {
+          u8g2.drawStr(3, 16, "LAT :");
+          u8g2.setCursor(22, 16);
+          u8g2.println(lat_val, 6);
+          
+          
+          u8g2.drawStr(60, 16, "LON :");
+          u8g2.setCursor(79, 16);
+          u8g2.println(lng_val, 6);
+          
+        }
+        if (!alt_valid)
+        {
+          
+          u8g2.drawStr(3, 24, "ALT : ********");
+        }
+        else
+        {
+           
+          u8g2.drawStr(3, 24, "ALT :");
+          u8g2.setCursor(22, 24);
+          u8g2.println(alt_m_val, 2);   
+        }
+        
+        if (!sats_valid)
+        {
+          
+          u8g2.drawStr(60, 24, "GPS LOCK : **");
+        }
+        else
+        {
+         
+          u8g2.drawStr(60, 24, "GPS LOCK :");
+          u8g2.setCursor(100, 24);
+          u8g2.println(sats_val, 1);   
+        }
+        
+        if (!time_valid)
+        {
+          u8g2.drawStr(74, 7, "Time : ********");
+         
+        }
+        else
+        {
+          char time_string[32];
+          sprintf(time_string, "Time : %02d:%02d:%02d \n", hr_val_jp, min_val, sec_val);
+          u8g2.setCursor(74, 7);
+          u8g2.print(time_string);    
+        }
+
+         u8g2.drawStr(3, 52, "UTC:");
+         u8g2.setCursor(22, 52);
+         u8g2.println(acBuffer);
+         
+        
+         u8g2.drawStr(3, 40, "LAT:");
+         u8g2.setCursor(22, 40);
+         u8g2.println(dSatLAT,4);
+         u8g2.drawStr(60, 40, "  LON: ");
+         u8g2.setCursor(80, 40);
+         u8g2.println(dSatLON,4); 
+
+         u8g2.drawStr(3, 46, "AZ:");
+         u8g2.setCursor(22, 46);
+         u8g2.println(dSatAZ,2);
+        
+         u8g2.drawStr(60, 46, "  EL: ");
+         u8g2.setCursor(80, 46);
+         u8g2.println(dSatEL,2);
+
+         u8g2.drawStr(3, 34, "SAT:");
+         u8g2.setCursor(22, 34);
+         u8g2.println(tleName);
+         
+     
+        } while ( u8g2.nextPage() );
+
+    //else {
+    OLED_2.setFont(u8g2_font_u8glib_4_tr);
+    OLED_2.setDrawColor(1);
+    OLED_2.drawXBMP(0,1, world_width, world_height, world_bits);
+    OLED_2.drawFrame(0,0,128,64);
+    OLED_2.setDrawColor(2);
+    //Calculate current location on screen
+    float klon = dSatLON;
+    float klat = dSatLAT;
+    if (klon > 0) {
+       xlon = (((klon /180)*64) +64);
+    }
+    else if (klon < 0) {
+      klon=-klon;
+       xlon = (64-((klon /180)*64)); 
+    } 
+    if (klat > 0){
+       ylat = (32-((klat/90)*32));
+    }
+    else if (klat < 0){
+      klat=-klat;
+       ylat = (((klat/90)*32)+32);  
+    }
+    
+
+
+    // Orbital path calculations
+        for (int delta = -50; delta < 50; delta = delta + 1) {
+        P13DateTime MyTime2(year_val, month_val, day_val, hr_val, (min_val + delta) , sec_val); // Set start time for the prediction
+        P13Observer MyQTH(pcMyName, dMyLAT, dMyLON, dMyALT);              // Set observer coordinates
+
+        P13Satellite MySAT2(tleName, tlel1, tlel2);                        // Create ISS data from TLE
+
+  
+        MySAT2.predict(MyTime2);              // Predict ISS for specific time
+        MySAT2.latlon(dSatLATb, dSatLONb);     // Get the rectangular coordinates
+
+        float klonb = dSatLONb;
+        float klatb = dSatLATb;
+        if (klonb > 0) {
+         xlonb = (((klonb /180)*64) +64);
+         }
+        else if (klonb < 0) {
+          klonb=-klonb;
+          xlonb = (64-((klonb /180)*64)); 
+         } 
+        if (klatb > 0){
+          ylatb = (32-((klatb/90)*32));
+          }
+        else if (klatb < 0){
+          klatb=-klatb;
+          ylatb = (((klatb/90)*32)+32);  
+        }
+    //draw orbital path
+    OLED_2.drawPixel(xlonb, ylatb);
+    
+        } 
+    //draw current location
+    OLED_2.setDrawColor(0);
+    OLED_2.drawCircle(xlon, ylat, 3);
+    OLED_2.setDrawColor(1);
+    OLED_2.drawCircle(xlon, ylat, 2);
+    OLED_2.setDrawColor(0);
+    OLED_2.drawCircle(xlon, ylat, 1);
+    OLED_2.setDrawColor(0);
+    OLED_2.drawPixel(xlon, ylat);
+    OLED_2.setFont(u8g2_font_u8glib_4_tr);    // u8g2 font
+    //u8g2.setCursor(xlon-5, ylat+8);
+    OLED_2.setDrawColor(0);
+
+    // Attempt to keep label on screen based on screen quadrant
+    if ((xlon <= 64) && (ylat <= 32)){
+    OLED_2.drawBox(xlon-1, ylat+4,(tlenamestring.length()+1)*4+4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    OLED_2.setCursor(xlon, ylat+9);
+    }
+
+    if ((xlon <= 64) && (ylat > 32)){
+    OLED_2.drawBox(xlon-1, ylat-10,(tlenamestring.length())*4+4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    OLED_2.setCursor(xlon, ylat-5);
+    }
+
+    if ((xlon > 64) && (ylat <= 32)){
+    OLED_2.drawBox(xlon-((tlenamestring.length())*4+4), ylat+4,(tlenamestring.length())*4+4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    OLED_2.setCursor(xlon-((tlenamestring.length())*4+3), ylat+9);
+    }
+
+    if ((xlon > 64) && (ylat > 32)){
+    OLED_2.drawBox(xlon-((tlenamestring.length())*4+4), ylat-10,(tlenamestring.length())*4+4,6);
+    //u8g2.drawBox(xlon-6, ylat+4,28,6);
+    OLED_2.setCursor(xlon-((tlenamestring.length())*4+3), ylat-5);
+    }
+
+    // write sattelite name
+    OLED_2.setDrawColor(1);
+    //u8g2.print("ISS");
+    //u8g2.print("NOAA18");
+    OLED_2.print(tleName);
+    
+ /*   OLED_3.setFont(u8g2_font_u8glib_4_tr);
+    OLED_3.setDrawColor(1);
+    OLED_3.drawFrame(0, 0, 128,64);  //setup fixed screen info and borders
+    OLED_3.drawLine(0, 9, 128,9);
+    //u8g2.drawLine(0, 27, 128,27);
+    OLED_3.drawStr(2, 7, " RAW GPS LOG ");
+    OLED_3.drawLog(3, 35, u8g2log); */
+    //}
+  //} while ( u8g2.nextPage() );
+  OLED_2.nextPage();
+  //OLED_3.nextPage();
+}
