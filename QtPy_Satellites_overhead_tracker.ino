@@ -227,29 +227,30 @@ void loop(void) {
     u8g2.drawStr(2, 61, "OKUBO HEAVY INDUSTRIES");
 
     u8g2.drawLine(104, 9, 104,54);
-    u8g2.drawLine(105, 31, 127,31);
+    u8g2.drawLine(105, 25, 127,25);
+    u8g2.drawLine(105, 40, 127,40);
     u8g2.drawStr(107, 16, ">15");
     u8g2.drawCircle(119,13,1);
-    u8g2.drawStr(107, 37, "active");
-
+    u8g2.drawStr(107, 31, "active");
+    u8g2.drawStr(107, 46, "check");
     
 
       u8g2.setCursor(107, 23);
-  //  if (satsabovedisplay = 0){
-   //   u8g2.println(satsabove); 
-  //  } else {
+    if (satsabovedisplay < 1){
+      u8g2.println(satsabove); 
+    } else {
       u8g2.println(satsabovedisplay);
- //   }
+    }
    
-      u8g2.setCursor(107, 44);
- //   if (satsdisplay = 0){
-   //   u8g2.print(sats); 
- //   } else {
+      u8g2.setCursor(107, 38);
+    if (satsdisplay < 1){
+      u8g2.print(sats); 
+    } else {
       u8g2.print(satsdisplay);
- //   }
+    }
 
-    
-   
+    u8g2.setCursor(107, 52);
+    u8g2.print(sats);
         if (!time_valid)
         {
           u8g2.drawStr(74, 7, "Time : ********");
