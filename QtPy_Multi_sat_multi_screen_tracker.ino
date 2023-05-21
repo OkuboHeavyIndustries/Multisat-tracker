@@ -65,7 +65,7 @@ TinyGPSPlus gps;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C OLED_2(U8G2_R0, 1, 2, /* reset=*/ U8X8_PIN_NONE);
-//U8G2_SSD1306_128X64_NONAME_F_SW_I2C OLED_3(U8G2_R0, 2, 3, /* reset=*/ U8X8_PIN_NONE);
+
 int xlon;
 int ylat;
 
@@ -73,12 +73,12 @@ int xlonb;
 int ylatb;
 
 int gpschar;
-/*
-#define U8LOG_WIDTH 32
-#define U8LOG_HEIGHT 4
-uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT*10];
-U8G2LOG u8g2log;
-*/
+
+//#define U8LOG_WIDTH 32
+//#define U8LOG_HEIGHT 4
+//uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT*10];
+//U8G2LOG u8g2log;
+
 // map of the World
 
 #define world_width 128
@@ -174,7 +174,7 @@ void setup(void) {
   Serial.begin(GPSBaud); //uncomment to debug
   u8g2.begin();  
   OLED_2.begin();
-  //OLED_3.begin();
+  
   pixels.begin();  // initialize the neopixel  
 
  // while (!Serial) {
@@ -251,7 +251,7 @@ void loop(void) {
   while (Serial1.available()>0)
       {  gpschar = Serial1.read(); //read raw gps data to gpschar
        // Serial.write(gpschar);  // uncomment to send raw gps over Serial to debug
-    //  u8g2log.write(gpschar);   // write raw gps data to u8g2log buffer
+     // u8g2log.write(gpschar);   // write raw gps data to u8g2log buffer
         gps.encode(gpschar);      // extract useful info from raw gps data
       }
   
@@ -312,9 +312,9 @@ void loop(void) {
          
   u8g2.firstPage();
   OLED_2.firstPage();
- // OLED_3.firstPage();
+ 
   do {
-     // if (sec_val < (30)) {    
+        
         u8g2.setFont(u8g2_font_u8glib_4_tr);    // u8g2 font 
         
 
@@ -410,9 +410,9 @@ void loop(void) {
          u8g2.println(tleName);
          
      
-        } while ( u8g2.nextPage() );
+       } while ( u8g2.nextPage() );
 
-    //else {
+
     OLED_2.setFont(u8g2_font_u8glib_4_tr);
     OLED_2.setDrawColor(1);
     OLED_2.drawXBMP(0,1, world_width, world_height, world_bits);
@@ -513,15 +513,8 @@ void loop(void) {
     //u8g2.print("NOAA18");
     OLED_2.print(tleName);
     
- /*   OLED_3.setFont(u8g2_font_u8glib_4_tr);
-    OLED_3.setDrawColor(1);
-    OLED_3.drawFrame(0, 0, 128,64);  //setup fixed screen info and borders
-    OLED_3.drawLine(0, 9, 128,9);
-    //u8g2.drawLine(0, 27, 128,27);
-    OLED_3.drawStr(2, 7, " RAW GPS LOG ");
-    OLED_3.drawLog(3, 35, u8g2log); */
-    //}
-  //} while ( u8g2.nextPage() );
+ 
+    
   OLED_2.nextPage();
-  //OLED_3.nextPage();
+     
 }
