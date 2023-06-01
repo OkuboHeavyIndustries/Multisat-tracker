@@ -382,8 +382,10 @@ const unsigned char* epd_bitmap_allArray[1] = {
      }
    
      lat_val = gps.location.lat();  /* Get latitude data */
+     //lat_val = (gps.location.lat() -2.158285);/*NK*/
      loc_valid = gps.location.isValid(); /* Check if valid location data is available */
      lng_val = gps.location.lng(); /* Get longtitude data */
+     //lng_val = (gps.location.lng()-14.154613); /* NK */
      alt_m_val = gps.altitude.meters();  /* Get altitude data in meters */
      alt_valid = gps.altitude.isValid(); /* Check if valid altitude data is available */
      hr_val = gps.time.hour(); /* Get hour */
@@ -445,7 +447,7 @@ const unsigned char* epd_bitmap_allArray[1] = {
         u8g2.drawFrame(0, 0, 128,64);  //setup fixed screen info and borders
     u8g2.drawLine(0, 9, 128,9);
     u8g2.drawLine(0, 27, 128,27);
-    u8g2.drawStr(3, 7, "MULTI-SAT TRACKER");
+    u8g2.drawStr(3, 7, "MULTI-SAT TRACK");
     u8g2.drawLine(0, 54, 128,54);
     u8g2.drawStr(3, 61, "OKUBO HEAVY INDUSTRIES");
 
@@ -563,7 +565,7 @@ const unsigned char* epd_bitmap_allArray[1] = {
 
 
     // Orbital path calculations
-        for (int delta = -50; delta < 50; delta = delta + 1) {
+        for (int delta = -60; delta < 60; delta = delta + 1) {
         P13DateTime MyTime2(year_val, month_val, day_val, hr_val, (min_val + delta) , sec_val); // Set start time for the prediction
         P13Observer MyQTH(pcMyName, dMyLAT, dMyLON, dMyALT);              // Set observer coordinates
 
